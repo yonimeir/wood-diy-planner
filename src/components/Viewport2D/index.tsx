@@ -77,23 +77,35 @@ function draw2DView(
   const toCanvasX = (v: number) => v * scale + offsetX;
   const toCanvasY = (v: number) => H - (v * scale + offsetY); // flip Y
 
-  // Draw grid — minor lines every 10 cm, major every 50 cm
-  const gridMinor = 10;
-  const gridMajor = 50;
+  // Draw grid — dynamically calculate grid size based on scale to prevent infinite loops
+  let gridMinor = 10;
+  let gridMajor = 50;
+
+  // We want roughly 20-50 lines visible total. If bounds are huge, increase grid size.
+  const worldSize = Math.max(bW, bH);
+  if (worldSize > 2000) { gridMinor = 100; gridMajor = 500; }
+  if (worldSize > 10000) { gridMinor = 500; gridMajor = 5000; }
+  if (worldSize > 50000) { gridMinor = 5000; gridMajor = 50000; }
+
   const startX = Math.floor(bounds.minX / gridMinor) * gridMinor;
   const startY = Math.floor(bounds.minY / gridMinor) * gridMinor;
+
+  // Add a safety circuit breaker
+  const maxLines = 1000;
 
   // Minor lines
   ctx.strokeStyle = '#9aa3b0';
   ctx.lineWidth = 0.8;
-  for (let gx = startX; gx <= bounds.maxX; gx += gridMinor) {
+  let counter = 0;
+  for (let gx = startX; gx <= bounds.maxX && counter++ < maxLines; gx += gridMinor) {
     if (gx % gridMajor === 0) continue; // skip — drawn as major
     ctx.beginPath();
     ctx.moveTo(toCanvasX(gx), 0);
     ctx.lineTo(toCanvasX(gx), H);
     ctx.stroke();
   }
-  for (let gy = startY; gy <= bounds.maxY; gy += gridMinor) {
+  counter = 0;
+  for (let gy = startY; gy <= bounds.maxY && counter++ < maxLines; gy += gridMinor) {
     if (gy % gridMajor === 0) continue;
     ctx.beginPath();
     ctx.moveTo(0, toCanvasY(gy));
@@ -106,7 +118,8 @@ function draw2DView(
   ctx.lineWidth = 1.2;
   ctx.fillStyle = '#5a6880';
   ctx.font = '9px monospace';
-  for (let gx = startX; gx <= bounds.maxX; gx += gridMajor) {
+  counter = 0;
+  for (let gx = startX; gx <= bounds.maxX && counter++ < maxLines; gx += gridMajor) {
     if (gx % gridMajor !== 0) continue;
     ctx.beginPath();
     ctx.moveTo(toCanvasX(gx), 0);
@@ -114,7 +127,8 @@ function draw2DView(
     ctx.stroke();
     if (gx !== 0) ctx.fillText(`${gx}`, toCanvasX(gx) + 2, 9);
   }
-  for (let gy = startY; gy <= bounds.maxY; gy += gridMajor) {
+  counter = 0;
+  for (let gy = startY; gy <= bounds.maxY && counter++ < maxLines; gy += gridMajor) {
     if (gy % gridMajor !== 0) continue;
     ctx.beginPath();
     ctx.moveTo(0, toCanvasY(gy));
@@ -134,8 +148,8 @@ function draw2DView(
   // Draw boards
   for (const b of boards) {
     const { x, y, z, length, boardType } = b;
-    const w = boardType.width;
-    const h = boardType.height;
+    const w = boardType?.width || 10;
+    const h = boardType?.height || 5;
     const l = length;
 
     let bx: number, by: number, bw: number, bh: number;
