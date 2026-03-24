@@ -8,7 +8,7 @@
  */
 import { useRef, useState, useCallback, useEffect } from 'react';
 import type { ThreeEvent } from '@react-three/fiber';
-import { Html } from '@react-three/drei';
+import { Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { useStore } from '../../store';
 import type { PlacedBoard } from '../../store';
@@ -165,29 +165,25 @@ export default function BoardMesh({ board, onRegisterRef }: BoardMeshProps) {
         </lineSegments>
       )}
 
-      {/* Optional label badge */}
-      {board.label && (isSelected || hovered) && (
-        <Html position={[0, h / 2 + GAP_LABEL, 0]} center distanceFactor={80}>
-          <div
-            style={{
-              background: 'rgba(0,0,0,0.75)',
-              color: '#fff',
-              padding: '2px 8px',
-              borderRadius: 4,
-              fontSize: 11,
-              pointerEvents: 'none',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {board.label}
-          </div>
-        </Html>
+      {/* Engraved/Painted label directly on the board face */}
+      {board.label && (
+        <Text
+          position={[0, h / 2 + 0.05, 0]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          fontSize={Math.min(w * 0.4, 4)} // Scale with width, but max 4cm
+          color={isSelected ? "#0ea5e9" : "rgba(0,0,0,0.4)"}
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={0.05}
+          outlineColor="#ffffff"
+          renderOrder={1} // ensure it draws above the board
+        >
+          {String(board.label)}
+        </Text>
       )}
 
-      {/* Tinkercad-style selection gizmo */}
       {isSelected && <SelectionGizmo board={board} groupRef={groupRef} />}
     </group>
   );
 }
-
-const GAP_LABEL = 4;
+// Sync position/rotation from store — skipped while dragging to avoid fighting Three.js

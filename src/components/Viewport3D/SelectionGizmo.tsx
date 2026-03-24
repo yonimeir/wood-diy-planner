@@ -239,11 +239,10 @@ export default function SelectionGizmo({ board, groupRef }: Props) {
   const handleRotateRedDown = makeWorldRotHandler(new THREE.Vector3(0, 0, 1), (dx) => dx);
   const handleRotateCyanDown = makeWorldRotHandler(new THREE.Vector3(1, 0, 0), (_dx, dy) => dy);
 
-  // ── Derived arc radii ─────────────────────────────────────────────────────────
+  // ── Derived arc logic ─────────────────────────────────────────────────────────
 
-  const arcRadY = Math.max(w, l) * 0.5 + 8;
-  const arcRadX = Math.max(h, l) * 0.5 + 8;
-  const arcRadZ = Math.max(w, h) * 0.5 + 8;
+  // Fixed radius for Tinkercad-style subtle arcs
+  const ARC_RAD = 7;
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -259,32 +258,22 @@ export default function SelectionGizmo({ board, groupRef }: Props) {
       {/* ── ELEVATION CONE ── (Top center) */}
       <ElevateCone position={[0, h / 2 + 10, 0]} onPointerDown={handleHeightDown} />
       
-      {/* ── ROTATION ARCS ── */}
-      {/* Rotate Y (horizontal arc) */}
-      <RotArc radius={arcRadY} color="#64748b" rotation={[Math.PI / 2, 0, 0]} position={[0, -h/2 - 2, 0]} onPointerDown={handleRotateYDown} />
-      {/* Rotate X (red arc on Z axis) */}
-      <RotArc radius={arcRadX} color="#ef4444" rotation={[0, Math.PI / 2, -Math.PI/2]} position={[-w/2 - 2, 0, 0]} onPointerDown={handleRotateRedDown} />
-      {/* Rotate Z (cyan arc on X axis) */}
-      <RotArc radius={arcRadZ} color="#06b6d4" rotation={[0, 0, Math.PI/2]} position={[0, 0, l / 2 + 2]} onPointerDown={handleRotateCyanDown} />
+      {/* ── ROTATION ARCS (Small curved arrows hovering near faces) ── */}
+      {/* Rotate Y (yaw) - horizontal arc on the floor, past the end of the board */}
+      <RotArc radius={ARC_RAD} color="#64748b" rotation={[Math.PI / 2, 0, 0]} position={[0, -h/2 - 1, l/2 + 10]} onPointerDown={handleRotateYDown} />
+      {/* Rotate X (pitch) - red arc on the side */}
+      <RotArc radius={ARC_RAD} color="#ef4444" rotation={[0, Math.PI / 2, -Math.PI/2]} position={[-w/2 - 10, 0, 0]} onPointerDown={handleRotateRedDown} />
+      {/* Rotate Z (roll) - cyan arc on the front face */}
+      <RotArc radius={ARC_RAD} color="#06b6d4" rotation={[0, 0, Math.PI/2]} position={[0, 0, l / 2 + 10]} onPointerDown={handleRotateCyanDown} />
 
       {/* ── RESIZE HANDLES ── */}
       <ResizeCube position={[0, 0,  l / 2 + CUBE_SIZE/2]} onPointerDown={handleLengthPlusDown}  />
       <ResizeCube position={[0, 0, -l / 2 - CUBE_SIZE/2]} onPointerDown={handleLengthMinusDown} />
 
       {/* ── DIMENSION LABELS (HTML OVERLAYS) ── */}
-      {/* Length floating box */}
+      {/* Only show Length box, per user request */}
       <Html position={[0, 0, l / 2 + 8]} center zIndexRange={[100, 0]}>
          <DimInput val={l} onChange={(v) => updateBoard(board.id, { length: v })} label="אורך" />
-      </Html>
-      
-      {/* Width fixed box */}
-      <Html position={[w / 2 + 6, 0, 0]} center zIndexRange={[100, 0]}>
-         <DimInput val={w} disabled label="רוחב" />
-      </Html>
-      
-      {/* Height fixed box */}
-      <Html position={[0, h / 2 + 6, 0]} center zIndexRange={[100, 0]}>
-         <DimInput val={h} disabled label="עובי" />
       </Html>
 
       {/* Z Elevation label (only shown if levitating) */}
