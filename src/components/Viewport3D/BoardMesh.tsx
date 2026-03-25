@@ -166,21 +166,20 @@ export default function BoardMesh({ board, onRegisterRef }: BoardMeshProps) {
       )}
 
       {/* Engraved/Painted label directly on the board face */}
-      {board.label && (
-        <Text
-          position={[0, h / 2 + 0.05, 0]}
-          rotation={[-Math.PI / 2, 0, 0]}
-          fontSize={Math.min(w * 0.4, 4)} // Scale with width, but max 4cm
-          color={isSelected ? "#0ea5e9" : "rgba(0,0,0,0.4)"}
-          anchorX="center"
-          anchorY="middle"
-          outlineWidth={0.05}
-          outlineColor="#ffffff"
-          renderOrder={1} // ensure it draws above the board
-        >
-          {String(board.label)}
-        </Text>
-      )}
+      <Text
+        position={[w / 2 + 0.01, 0, 0]} // Long side face (Positive X)
+        rotation={[0, Math.PI / 2, 0]} // Face outward along X
+        fontSize={Math.min(l * 0.1, h * 0.7, 3.5)} // Scale with length and height
+        color={isSelected ? "#ffffff" : "rgba(255,255,255,0.6)"}
+        font="https://fonts.gstatic.com/s/inter/v12/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfMZhrib2Bg-4.ttf"
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={isSelected ? 0.04 : 0}
+        outlineColor="rgba(0,0,0,0.4)"
+        renderOrder={1}
+      >
+        {`${w}x${h}`}
+      </Text>
 
       {isSelected && <SelectionGizmo board={board} groupRef={groupRef} />}
     </group>

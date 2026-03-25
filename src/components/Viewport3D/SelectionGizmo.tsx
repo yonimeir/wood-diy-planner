@@ -50,7 +50,7 @@ function DimInput({ val, onChange, label, disabled = false }: { val: number, onC
   );
 }
 
-// ─── Rotation Arc ─────────────────────────────────────────────────────────────
+// ─── Rotation Arc (Sleek, Flat Vector Style) ──────────────────────────────────
 
 function RotArc({ radius, color, rotation, position = [0,0,0], onPointerDown }: {
   radius: number; color: string;
@@ -59,28 +59,45 @@ function RotArc({ radius, color, rotation, position = [0,0,0], onPointerDown }: 
   onPointerDown: (e: ThreeEvent<PointerEvent>) => void;
 }) {
   const [hovered, setHovered] = useState(false);
+  
+  // Arch length is 120 degrees
+  const ARC_LEN = Math.PI / 1.5;
+  // Offset rotation so the center of the arc points up
+  const visualRot = new THREE.Euler(0, 0, (Math.PI - ARC_LEN) / 2);
+
+  const matColor = hovered ? '#ef4444' : color;
+  const thickness = hovered ? 0.25 : 0.15;
+  const coneRad = hovered ? 1 : 0.7;
+  const coneLen = hovered ? 2.5 : 2;
+
   return (
     <group position={position} rotation={rotation} onPointerDown={onPointerDown} onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor='ew-resize'; }} onPointerOut={() => { setHovered(false); document.body.style.cursor='auto'; }}>
-      {/* Visual Arc */}
-      <mesh>
-        {/* Draw a half circle (Torusa) */}
-        <torusGeometry args={[radius, hovered ? 1 : 0.6, 8, 48, Math.PI]} />
-        <meshStandardMaterial color={hovered ? '#fbbf24' : color} roughness={0.3} toneMapped={false} />
-      </mesh>
+      
       {/* Invisible thicker hit zone */}
-      <mesh>
-        <torusGeometry args={[radius, 5, 8, 24, Math.PI]} />
+      <mesh rotation={visualRot}>
+        <torusGeometry args={[radius, 4, 8, 24, ARC_LEN]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
-      {/* Arrows at the ends of the arc */}
-      <mesh position={[radius, 0, 0]} rotation={[Math.PI/2, Math.PI/2, 0]}>
-        <coneGeometry args={[hovered ? 2.5 : 1.8, 5, 8]} />
-        <meshStandardMaterial color={hovered ? '#fbbf24' : color} roughness={0.3} toneMapped={false} />
+
+      {/* Visual Arc - Thin and flat */}
+      <mesh rotation={visualRot}>
+        <torusGeometry args={[radius, thickness, 8, 48, ARC_LEN]} />
+        <meshBasicMaterial color={matColor} toneMapped={false} depthTest={false} />
       </mesh>
-      <mesh position={[-radius, 0, 0]} rotation={[Math.PI/2, -Math.PI/2, 0]}>
-        <coneGeometry args={[hovered ? 2.5 : 1.8, 5, 8]} />
-        <meshStandardMaterial color={hovered ? '#fbbf24' : color} roughness={0.3} toneMapped={false} />
-      </mesh>
+
+      <group rotation={visualRot}>
+        {/* Right Arrowhead */}
+        <mesh position={[radius * Math.cos(ARC_LEN), radius * Math.sin(ARC_LEN), 0]} rotation={[0, 0, ARC_LEN + Math.PI/2]}>
+          <coneGeometry args={[coneRad, coneLen, 8]} />
+          <meshBasicMaterial color={matColor} toneMapped={false} depthTest={false} />
+        </mesh>
+        
+        {/* Left Arrowhead */}
+        <mesh position={[radius, 0, 0]} rotation={[0, 0, -Math.PI/2]}>
+          <coneGeometry args={[coneRad, coneLen, 8]} />
+          <meshBasicMaterial color={matColor} toneMapped={false} depthTest={false} />
+        </mesh>
+      </group>
     </group>
   );
 }
@@ -259,12 +276,12 @@ export default function SelectionGizmo({ board, groupRef }: Props) {
       <ElevateCone position={[0, h / 2 + 10, 0]} onPointerDown={handleHeightDown} />
       
       {/* ── ROTATION ARCS (Small curved arrows hovering near faces) ── */}
-      {/* Rotate Y (yaw) - horizontal arc on the floor, past the end of the board */}
-      <RotArc radius={ARC_RAD} color="#64748b" rotation={[Math.PI / 2, 0, 0]} position={[0, -h/2 - 1, l/2 + 10]} onPointerDown={handleRotateYDown} />
-      {/* Rotate X (pitch) - red arc on the side */}
-      <RotArc radius={ARC_RAD} color="#ef4444" rotation={[0, Math.PI / 2, -Math.PI/2]} position={[-w/2 - 10, 0, 0]} onPointerDown={handleRotateRedDown} />
-      {/* Rotate Z (roll) - cyan arc on the front face */}
-      <RotArc radius={ARC_RAD} color="#06b6d4" rotation={[0, 0, Math.PI/2]} position={[0, 0, l / 2 + 10]} onPointerDown={handleRotateCyanDown} />
+      {/* Rotate Y (yaw) - horizontal arc on the floor under the center of the board */}
+      <RotArc radius={ARC_RAD} color="#64748b" rotation={[Math.PI / 2, 0, 0]} position={[0, -h/2 - 1, 0]} onPointerDown={handleRotateYDown} />
+      {/* Rotate X (pitch) - red arc hugging the side */}
+      <RotArc radius={ARC_RAD} color="#ef4444" rotation={[0, Math.PI / 2, -Math.PI/2]} position={[-w/2 - 2, 0, 0]} onPointerDown={handleRotateRedDown} />
+      {/* Rotate Z (roll) - cyan arc hugging the front face */}
+      <RotArc radius={ARC_RAD} color="#06b6d4" rotation={[0, 0, Math.PI/2]} position={[0, 0, l / 2 + 2]} onPointerDown={handleRotateCyanDown} />
 
       {/* ── RESIZE HANDLES ── */}
       <ResizeCube position={[0, 0,  l / 2 + CUBE_SIZE/2]} onPointerDown={handleLengthPlusDown}  />
