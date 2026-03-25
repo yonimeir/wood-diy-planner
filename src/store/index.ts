@@ -46,11 +46,9 @@ interface ProjectStore {
   showGrid: boolean;
   transformMode: TransformMode;
   snapEnabled: boolean;
-  boardSnapEnabled: boolean;
-  boardSnapGap: number;
-
+  saveHistory: () => void;
   addBoard: (board: Omit<PlacedBoard, 'id'>) => string;
-  updateBoard: (id: string, changes: Partial<PlacedBoard>) => void;
+  updateBoard: (id: string, changes: Partial<PlacedBoard>, saveHistory?: boolean) => void;
   removeBoard: (id: string) => void;
   selectBoard: (id: string | null) => void;
   duplicateBoard: (id: string) => void;
@@ -87,6 +85,11 @@ export const useStore = create<ProjectStore>()(
       boards: [],
       pastBoards: [],
       futureBoards: [],
+      
+      saveHistory: () => set(state => ({
+        pastBoards: [...state.pastBoards, state.boards].slice(-50),
+        futureBoards: []
+      })),
 
       undo: () => set(state => {
         if (state.pastBoards.length === 0) return {};
@@ -132,10 +135,10 @@ export const useStore = create<ProjectStore>()(
         return id;
       },
 
-      updateBoard: (id, changes) => {
+      updateBoard: (id, changes, saveHistory = true) => {
         set(state => {
           const newBoards = state.boards.map(b => b.id === id ? { ...b, ...changes } : b);
-          return withHistory(state, newBoards);
+          return saveHistory ? withHistory(state, newBoards) : { boards: newBoards };
         });
       },
 

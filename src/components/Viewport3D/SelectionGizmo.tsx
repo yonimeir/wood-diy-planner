@@ -127,7 +127,7 @@ function ResizeCube({ position, onPointerDown }: {
   );
 }
 
-// ─── Elevation Cone (Y Translation) ───────────────────────────────────────────
+// ─── Elevation Cone (Y Translation, Flat 2D Style) ────────────────────────────
 
 function ElevateCone({ position, onPointerDown }: { position: [number, number, number]; onPointerDown: (e: ThreeEvent<PointerEvent>) => void }) {
   const [hovered, setHovered] = useState(false);
@@ -138,9 +138,10 @@ function ElevateCone({ position, onPointerDown }: { position: [number, number, n
         <cylinderGeometry args={[5, 5, 20]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
+      {/* Visual flat upward triangle */}
       <mesh>
-        <coneGeometry args={[3, 6, 12]} />
-        <meshStandardMaterial color={hovered ? "#3b82f6" : "#1e293b"} roughness={0.4} toneMapped={false} />
+        <circleGeometry args={[2.5, 3]} />
+        <meshBasicMaterial color={hovered ? "#3b82f6" : "#1e293b"} toneMapped={false} depthTest={false} side={THREE.DoubleSide} />
       </mesh>
     </group>
   );
@@ -149,7 +150,7 @@ function ElevateCone({ position, onPointerDown }: { position: [number, number, n
 // ─── Main Gizmo ───────────────────────────────────────────────────────────────
 
 export default function SelectionGizmo({ board, groupRef }: Props) {
-  const { updateBoard } = useStore();
+  const { updateBoard, saveHistory } = useStore();
   const { snapEnabled } = useSceneCtx();
   const { startDrag, startScreenDrag } = useHandleDrag();
   const { camera, gl } = useThree();
@@ -158,17 +159,16 @@ export default function SelectionGizmo({ board, groupRef }: Props) {
   const w  = bt.width;
   const h  = bt.height;
   const l  = board.length;
-  const pX = board.pivotX ?? 0;
-  const pY = board.pivotY ?? 0;
-  const pZ = board.pivotZ ?? 0;
 
-  // ── Height handler (Y translation) ───────────────────────────────────────────
+  // ── Handlers ────────────────────────────────────────────────────────────────
+
   const handleHeightDown = useCallback((e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
+    saveHistory();
     if (!groupRef.current) return;
     const bwc = groupRef.current.getWorldPosition(new THREE.Vector3());
-    const cam = camera as THREE.PerspectiveCamera;
     const dist = camera.position.distanceTo(bwc);
+    const cam = camera as THREE.PerspectiveCamera;
     const uPerPx = (2 * dist * Math.tan((cam.fov * Math.PI) / 360)) / gl.domElement.clientHeight;
     const startY = board.y;
     let acc = 0;
@@ -176,13 +176,14 @@ export default function SelectionGizmo({ board, groupRef }: Props) {
       acc -= dy * uPerPx;
       let ny = Math.max(0, startY + acc);
       if (snapEnabled) ny = Math.round(ny * 2) / 2;
-      updateBoard(board.id, { y: ny });
+      updateBoard(board.id, { y: ny }, false);
     });
-  }, [board.id, board.y, groupRef, camera, gl.domElement.clientHeight, startScreenDrag, updateBoard, snapEnabled]);
+  }, [board.id, board.y, groupRef, camera, gl.domElement.clientHeight, startScreenDrag, updateBoard, saveHistory, snapEnabled]);
 
   // ── Length handlers (Z scaling) ──────────────────────────────────────────────
   const makeLengthHandler = useCallback((sign: 1 | -1) => (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
+    saveHistory();
     if (!groupRef.current) return;
     const group   = groupRef.current;
     const bwc     = group.getWorldPosition(new THREE.Vector3());
@@ -197,64 +198,40 @@ export default function SelectionGizmo({ board, groupRef }: Props) {
       const changes: Partial<PlacedBoard> = sign === 1
         ? { length: nl }
         : { length: nl, z: startZ - (nl - startL) };
-      updateBoard(board.id, changes);
+      updateBoard(board.id, changes, false);
     });
-  }, [board.id, board.length, board.z, groupRef, startDrag, updateBoard, snapEnabled]);
+  }, [board.id, board.length, board.z, groupRef, startDrag, updateBoard, saveHistory, snapEnabled]);
 
   const handleLengthPlusDown  = makeLengthHandler(1);
   const handleLengthMinusDown = makeLengthHandler(-1);
 
   // ── RotationHandlers ─────────────────────────────────────────────────────────
 
-  const handleRotateYDown = useCallback((e: ThreeEvent<PointerEvent>) => {
-    e.stopPropagation();
-    if (!groupRef.current) return;
-    const group = groupRef.current;
-    const startBwc = group.getWorldPosition(new THREE.Vector3());
-    const pivotWorld = startBwc.clone().add(new THREE.Vector3(pX, pY, pZ).applyQuaternion(group.quaternion));
-    const xzPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -pivotWorld.y);
-    const startQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(board.rotationX, board.rotationY, board.rotationZ, 'XYZ'));
-    let startA: number | null = null;
-    startDrag(e.nativeEvent.clientX, e.nativeEvent.clientY, xzPlane, (pt) => {
-      const a = Math.atan2(pt.z - pivotWorld.z, pt.x - pivotWorld.x);
-      if (startA === null) { startA = a; return; }
-      let delta = a - startA;
-      if (snapEnabled) delta = Math.round(delta / (Math.PI / 12)) * (Math.PI / 12);
-      const deltaQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), delta);
-      const newBwc = pivotWorld.clone().add(startBwc.clone().sub(pivotWorld).applyQuaternion(deltaQ));
-      const newQ = deltaQ.clone().multiply(startQ);
-      const eu = new THREE.Euler().setFromQuaternion(newQ, 'XYZ');
-      updateBoard(board.id, {
-        x: newBwc.x - w / 2, y: Math.max(0, newBwc.y - h / 2), z: newBwc.z - l / 2,
-        rotationX: eu.x, rotationY: eu.y, rotationZ: eu.z,
+  const makeLocalRotHandler = useCallback((axis: THREE.Vector3, getDelta: (dx: number, dy: number) => number) => {
+    return (e: ThreeEvent<PointerEvent>) => {
+      e.stopPropagation();
+      saveHistory(); // save state before rotating
+      
+      startScreenDrag(e.nativeEvent.clientX, e.nativeEvent.clientY, (dx, dy) => {
+        const rotDelta = getDelta(dx, dy) * ROT_SENS;
+        // Rotate the group locally on the specified axis
+        groupRef.current!.rotateOnAxis(axis, rotDelta);
+        // Extract eulers
+        updateBoard(board.id, {
+          rotationX: groupRef.current!.rotation.x,
+          rotationY: groupRef.current!.rotation.y,
+          rotationZ: groupRef.current!.rotation.z,
+        }, false);
       });
-    });
-  }, [board, pX, pY, pZ, w, h, l, groupRef, startDrag, updateBoard, snapEnabled]);
+    };
+  }, [board.id, groupRef, saveHistory, startScreenDrag, updateBoard]);
 
-  const makeWorldRotHandler = useCallback((worldAxis: THREE.Vector3, screenDelta: (dx: number, dy: number) => number) => (e: ThreeEvent<PointerEvent>) => {
-    e.stopPropagation();
-    if (!groupRef.current) return;
-    const group = groupRef.current;
-    const startBwc = group.getWorldPosition(new THREE.Vector3());
-    const pivotWorld = startBwc.clone().add(new THREE.Vector3(pX, pY, pZ).applyQuaternion(group.quaternion));
-    const startQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(board.rotationX, board.rotationY, board.rotationZ, 'XYZ'));
-    let acc = 0;
-    startScreenDrag(e.nativeEvent.clientX, e.nativeEvent.clientY, (dx, dy) => {
-      acc += screenDelta(dx, dy) * ROT_SENS;
-      const snapped = snapEnabled ? Math.round(acc / (Math.PI / 12)) * (Math.PI / 12) : acc;
-      const deltaQ = new THREE.Quaternion().setFromAxisAngle(worldAxis, snapped);
-      const newBwc = pivotWorld.clone().add(startBwc.clone().sub(pivotWorld).applyQuaternion(deltaQ));
-      const newQ = deltaQ.clone().multiply(startQ);
-      const eu = new THREE.Euler().setFromQuaternion(newQ, 'XYZ');
-      updateBoard(board.id, {
-        x: newBwc.x - w / 2, y: Math.max(0, newBwc.y - h / 2), z: newBwc.z - l / 2,
-        rotationX: eu.x, rotationY: eu.y, rotationZ: eu.z,
-      });
-    });
-  }, [board, pX, pY, pZ, w, h, l, groupRef, startScreenDrag, updateBoard, snapEnabled]);
-
-  const handleRotateRedDown = makeWorldRotHandler(new THREE.Vector3(0, 0, 1), (dx) => dx);
-  const handleRotateCyanDown = makeWorldRotHandler(new THREE.Vector3(1, 0, 0), (_dx, dy) => dy);
+  // Y axis rotation handler (Yaw) corresponds to the grey floor arc
+  const handleRotateYDown = makeLocalRotHandler(new THREE.Vector3(0, 1, 0), (dx) => dx);
+  // X axis rotation handler (Pitch) corresponds to the Red arc
+  const handleRotateRedDown = makeLocalRotHandler(new THREE.Vector3(1, 0, 0), (_dx, dy) => dy);
+  // Z axis rotation handler (Roll) corresponds to the Cyan arc
+  const handleRotateCyanDown = makeLocalRotHandler(new THREE.Vector3(0, 0, 1), (dx, _dy) => dx);
 
   // ── Derived arc logic ─────────────────────────────────────────────────────────
 
