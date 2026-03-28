@@ -227,16 +227,18 @@ export default function SelectionGizmo({ board, groupRef }: Props) {
   }, [board.id, groupRef, saveHistory, startScreenDrag, updateBoard]);
 
   // Y axis rotation handler (Yaw) corresponds to the grey floor arc
-  const handleRotateYDown = makeLocalRotHandler(new THREE.Vector3(0, 1, 0), (dx) => dx);
+  const handleRotateYDown = makeLocalRotHandler(new THREE.Vector3(0, 1, 0), (dx) => -dx);
   // X axis rotation handler (Pitch) corresponds to the Red arc
-  const handleRotateRedDown = makeLocalRotHandler(new THREE.Vector3(1, 0, 0), (_dx, dy) => dy);
+  const handleRotateRedDown = makeLocalRotHandler(new THREE.Vector3(1, 0, 0), (_dx, dy) => -dy);
   // Z axis rotation handler (Roll) corresponds to the Cyan arc
-  const handleRotateCyanDown = makeLocalRotHandler(new THREE.Vector3(0, 0, 1), (dx, _dy) => dx);
+  const handleRotateCyanDown = makeLocalRotHandler(new THREE.Vector3(0, 0, 1), (dx, _dy) => -dx);
 
   // ── Derived arc logic ─────────────────────────────────────────────────────────
 
   // Fixed radius for Tinkercad-style subtle arcs
   const ARC_RAD = 7;
+  const radToDeg = (r: number) => Math.round((r * 180) / Math.PI);
+  const degToRad = (d: number) => (d * Math.PI) / 180;
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -252,13 +254,30 @@ export default function SelectionGizmo({ board, groupRef }: Props) {
       {/* ── ELEVATION CONE ── (Top center) */}
       <ElevateCone position={[0, h / 2 + 10, 0]} onPointerDown={handleHeightDown} />
       
-      {/* ── ROTATION ARCS (Small curved arrows hovering near faces) ── */}
+      {/* ── ROTATION ARCS && EXACT INPUTS ── */}
       {/* Rotate Y (yaw) - horizontal arc on the floor under the center of the board */}
-      <RotArc radius={ARC_RAD} color="#64748b" rotation={[Math.PI / 2, 0, 0]} position={[0, -h/2 - 1, 0]} onPointerDown={handleRotateYDown} />
+      <group position={[0, -h/2 - 1, 0]}>
+        <RotArc radius={ARC_RAD} color="#64748b" rotation={[Math.PI / 2, 0, 0]} onPointerDown={handleRotateYDown} />
+        <Html position={[ARC_RAD + 2, 0, 0]} center zIndexRange={[100, 0]}>
+          <DimInput val={radToDeg(board.rotationY)} onChange={(v) => { saveHistory(); updateBoard(board.id, { rotationY: degToRad(v) }); }} label="Y°" />
+        </Html>
+      </group>
+
       {/* Rotate X (pitch) - red arc hugging the side */}
-      <RotArc radius={ARC_RAD} color="#ef4444" rotation={[0, Math.PI / 2, -Math.PI/2]} position={[-w/2 - 2, 0, 0]} onPointerDown={handleRotateRedDown} />
+      <group position={[-w/2 - 2, 0, 0]}>
+        <RotArc radius={ARC_RAD} color="#ef4444" rotation={[0, Math.PI / 2, -Math.PI/2]} onPointerDown={handleRotateRedDown} />
+        <Html position={[0, ARC_RAD + 2, 0]} center zIndexRange={[100, 0]}>
+          <DimInput val={radToDeg(board.rotationX)} onChange={(v) => { saveHistory(); updateBoard(board.id, { rotationX: degToRad(v) }); }} label="X°" />
+        </Html>
+      </group>
+
       {/* Rotate Z (roll) - cyan arc hugging the front face */}
-      <RotArc radius={ARC_RAD} color="#06b6d4" rotation={[0, 0, Math.PI/2]} position={[0, 0, l / 2 + 2]} onPointerDown={handleRotateCyanDown} />
+      <group position={[0, 0, l / 2 + 2]}>
+        <RotArc radius={ARC_RAD} color="#06b6d4" rotation={[0, 0, Math.PI/2]} onPointerDown={handleRotateCyanDown} />
+        <Html position={[ARC_RAD + 2, 0, 0]} center zIndexRange={[100, 0]}>
+          <DimInput val={radToDeg(board.rotationZ)} onChange={(v) => { saveHistory(); updateBoard(board.id, { rotationZ: degToRad(v) }); }} label="Z°" />
+        </Html>
+      </group>
 
       {/* ── RESIZE HANDLES ── */}
       <ResizeCube position={[0, 0,  l / 2 + CUBE_SIZE/2]} onPointerDown={handleLengthPlusDown}  />
